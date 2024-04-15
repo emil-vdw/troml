@@ -1,0 +1,23 @@
+* Types
+entry        -> Comment | table | table_array;
+
+table        -> header Newline+ ( key Equals expression Newline)* Newline*;
+
+table_array  -> "[" header "]" Newline+ table_body Newline*;
+
+header       -> "[" key "]";
+
+table_body   -> (pair Newline+)* (pair Eof)?;
+
+pair         -> key equals value;
+
+key          -> key_part ( Whitespace*  Dot key_part )*;
+
+value        -> inline_table | literal;
+
+inline_table -> "{" pair ( "," pair )* "}";
+
+key_part     -> BareKey | Integer | String;
+
+// TODO: Add date/time related tokens.
+literal      -> Integer | Float | String | True | False;
