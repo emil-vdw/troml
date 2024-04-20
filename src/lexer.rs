@@ -179,14 +179,12 @@ impl Lexer {
             }
         }
 
-        Ok(
-            Segment::new(
-                Token::String {
-                    content, literal: false, multiline: true
-                },
-                start,
-                self.location
-            )
+        // We have reachec the end of the file without finding the end of the string.
+         lexer_error!(
+             "unexpected end of file, expected end of multiline string",
+             self.file,
+             self.location,
+             self.location
         )
     }
 
@@ -445,15 +443,21 @@ mod tests {
             Location::from((0, 17, 17)),
             Location::from((0, 17, 17))
         )
-        ; "Three consequetive unescaped quotes"
+        ; "three consequetive unescaped quotes"
+    )]
+    #[test_case(
+        r#""""Hello world"#,
+        LexerError::new(
+            "unexpected end of file, expected end of multiline string",
+            &File::new("/tests/test.toml", String::from("\"\"\"Hello world")),
+            Location::from((0, 14, 14)),
+            Location::from((0, 14, 14))
+        )
+        ; "unterminated"
     )]
     fn test_invalid_multiline_string(
         multiline_string: &str, expected_error: LexerError
     ) {
-        match new_lexer(multiline_string).tokenize_multiline_string() {
-            Err(e) => println!("{}", e),
-            _ => (),
-        }
         assert_eq!(
             new_lexer(multiline_string).tokenize_multiline_string(),
             Err(expected_error)
