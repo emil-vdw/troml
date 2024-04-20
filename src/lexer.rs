@@ -97,7 +97,59 @@ impl Lexer {
     }
 
     fn tokenize_string(&mut self) -> Result<Segment, LexerError> {
-        todo!()
+        let start = self.location;
+        let mut content = String::new();
+
+        // Ignore the quotes, we don't want them to show up in the token.
+        self.advance();
+
+        while let Some(next_char) = self.peek(0) {
+            match next_char {
+                '\\' => {
+                    if self.peek(1).is_none() {
+                        self.advance();
+                        return lexer_error!(
+                            "unexpected end of file, expected an escaped character",
+                            self.file,
+                            self.location,
+                            self.location
+                        );
+                    }
+                    content.push_str(&self.advance_by(2).unwrap());
+                },
+                '\"' => {
+                    // The string should be terminated.
+                    let outside_char = self.peek(1);
+                    if outside_char.is_some_and(|c| c != '\n') {
+                        return lexer_error!(
+                            format!(
+                                "expected end of line, found '{}'",
+                                outside_char.unwrap()
+                            ),
+                            self.file,
+                            self.location,
+                            self.location
+                        );
+                    }
+
+                    self.advance();
+                    return Ok(Segment::new(
+                        Token::String { content, literal: false, multiline: false },
+                        start,
+                        self.location
+                    ));
+                },
+                _ => { content.push(self.advance().unwrap()) },
+            }
+        }
+
+        // We have reached the end of the file without finding the end of the string.
+        return lexer_error!(
+            "unexpected end of file, expected end of string",
+            self.file,
+            self.location,
+            self.location
+        )
     }
 
     fn tokenize_multiline_string(&mut self) -> Result<Segment, LexerError> {
@@ -359,6 +411,29 @@ mod tests {
     }
 
     #[test_case(
+        r#""I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF.""#, Segment::new(
+            Token::String {
+                content: r#"I'm a string. \"You can quote me\". Name\tJos\u00E9\nLocation\tSF."#.to_string(),
+                literal: false, multiline: false
+            },
+            Location::new(),
+            Location::from((0, 68, 68))
+        ) ; "A normal comment"
+    )]
+    fn test_tokenize_string(multiline_string: &str, expected_segment: Segment) {
+        let mut lexer = new_lexer(multiline_string);
+
+        match lexer.tokenize_string() {
+            Ok(segment) => {
+                assert_eq!(segment, expected_segment);
+            },
+            Err(e) => {
+                panic!("{}", e);
+            }
+        }
+    }
+
+    #[test_case(
         r#""""Hello world""""#, Segment::new(
             Token::String { content: "Hello world".to_string(), literal: false, multiline: true },
             Location::new(),
@@ -429,7 +504,6 @@ mod tests {
                 panic!("{}", e);
             }
         }
-        
     }
 
 
