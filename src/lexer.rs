@@ -361,14 +361,14 @@ mod tests {
             Token::String { content: "Hello world".to_string(), literal: false, multiline: true },
             Location::new(),
             Location::from((0, 17, 17))
-        ) ; "A simple multiline string"
+        ) ; "simple multiline string"
     )]
     #[test_case(
         "\"\"\"Hello world\"\"\"\n", Segment::new(
             Token::String { content: "Hello world".to_string(), literal: false, multiline: true },
             Location::new(),
             Location::from((0, 17, 17))
-        ) ; "A simple newline terminated multiline string"
+        ) ; "simple newline terminated multiline string"
     )]
     #[test_case(
         concat!(r#""""Here are two quotation marks: "". Simple enough.""""#, '\n'), Segment::new(
@@ -379,7 +379,18 @@ mod tests {
             },
             Location::new(),
             Location::from((0, 54, 54))
-        ) ; "A multiline string containing quotes"
+        ) ; "multiline string containing quotes"
+    )]
+    #[test_case(
+        concat!(r#""""Here are three quotation marks: ""\".""""#, '\n'), Segment::new(
+            Token::String {
+                content: "Here are three quotation marks: \"\"\\\".".to_string(),
+                literal: false,
+                multiline: true
+            },
+            Location::new(),
+            Location::from((0, 43, 43))
+        ) ; "three valid consequetive quotes"
     )]
     fn test_multiline_string(
         multiline_string: &str, expected_segment: Segment
