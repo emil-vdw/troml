@@ -142,17 +142,9 @@ impl Lexer {
                                         )
                                     )
                                 }
-
-                                // Line ends without string being terminated.
-                                return lexer_error!(
-                                    "unexpected end of line, expected '\"'",
-                                    self.file,
-                                    self.location,
-                                    self.location
-                                );
                             },
                             Some(outside_char) => {
-                                // Some other character
+                                // Some non-quote character after the quotes.
                                 if consecutive_quotes >= 3 {
                                     self.advance_by(consecutive_quotes);
                                     return lexer_error!(
@@ -163,8 +155,10 @@ impl Lexer {
                                     );
                                 }
 
+                                // We have determined that the quotes are valid
+                                // so we can add them to the content.
                                 content.push_str(
-                                    &self.advance_by(lookahead_index + 1).unwrap()
+                                    &self.advance_by(consecutive_quotes).unwrap()
                                 );
                                 break;
                             },
@@ -192,7 +186,7 @@ impl Lexer {
         let start = self.location;
         let mut comment_string = String::new();
 
-        while let Some(next_char) = dbg!(self.peek(0)) {
+        while let Some(next_char) = self.peek(0) {
             if next_char == '\n' {
                 break;
             }
@@ -310,7 +304,7 @@ impl Lexer {
                 section.push(next_char);
             } else {
                 // End of file reached before advancing `amount` characters.
-                return Some(section);
+                break;
             }
         }
 
@@ -392,15 +386,31 @@ mod tests {
             Location::from((0, 43, 43))
         ) ; "three valid consequetive quotes"
     )]
+    #[test_case(
+        concat!(r#""""Here are fifteen quotation marks: ""\"""\"""\"""\"""\".""""#, '\n'), Segment::new(
+            Token::String {
+                content: r#"Here are fifteen quotation marks: ""\"""\"""\"""\"""\"."#.to_string(),
+                literal: false,
+                multiline: true
+            },
+            Location::new(),
+            Location::from((0, 61, 61))
+        ) ; "many valid consequetive quotes"
+    )]
     fn test_multiline_string(
         multiline_string: &str, expected_segment: Segment
     ) {
         let mut lexer = new_lexer(multiline_string);
 
-        assert_eq!(
-            lexer.tokenize_multiline_string().unwrap(),
-            expected_segment
-        );
+        match lexer.tokenize_multiline_string() {
+            Ok(segment) => {
+                assert_eq!(segment, expected_segment);
+            },
+            Err(e) => {
+                panic!("{}", e);
+            }
+        }
+        
     }
 
 
