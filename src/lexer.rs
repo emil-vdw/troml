@@ -491,6 +491,21 @@ mod tests {
             Location::from((0, 56, 56))
         ) ; "containing quoted string"
     )]
+    #[test_case(
+        concat!(
+            r#""""First line"#, '\n',
+            r#"Second line"#, '\n',
+            r#"Third line""""#,
+        ), Segment::new(
+            Token::String {
+                content: "First line\nSecond line\nThird line".to_string(),
+                literal: false,
+                multiline: true
+            },
+            Location::new(),
+            Location::from((2, 13, 39))
+        ) ; "multiple lines"
+    )]
     fn test_multiline_string(
         multiline_string: &str, expected_segment: Segment
     ) {
