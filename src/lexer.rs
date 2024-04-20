@@ -260,6 +260,34 @@ impl Lexer {
         )
     }
 
+    fn tokenize_word(&mut self) -> Result<Segment, LexerError> {
+        let start = self.location;
+        let mut content = String::new();
+
+        loop {
+            match self.peek(0) {
+                Some(next_char) if Token::is_valid_identifier_char(next_char) => {
+                        content.push(self.advance().unwrap());
+                    },
+                Some(_) | None => {
+                    // First match keywords.
+                    let token = match &content[..] {
+                        "true" => Token::True,
+                        "false" => Token::False,
+                        _ => {
+                            Token::Identifier(content)
+                        }
+                    };
+                    return Ok(Segment::new(
+                        token,
+                        start,
+                        self.location
+                    ));
+                }
+            }
+        }
+    }
+
     pub fn tokenize(&mut self) -> Result<Vec<Segment>, LexerError> {
         let mut tokens: Vec<Segment> = Vec::new();
 
@@ -278,6 +306,24 @@ impl Lexer {
                 ',' => {
                     self.advance();
                     tokens.push(Segment::new(Token::Comma, self.location, self.location));
+                },
+
+                // Brackets
+                '[' => {
+                    self.advance();
+                    tokens.push(Segment::new(Token::OpenBracket, self.location, self.location));
+                },
+                ']' => {
+                    self.advance();
+                    tokens.push(Segment::new(Token::CloseBracket, self.location, self.location));
+                },
+                '{' => {
+                    self.advance();
+                    tokens.push(Segment::new(Token::OpenBrace, self.location, self.location));
+                },
+                '}' => {
+                    self.advance();
+                    tokens.push(Segment::new(Token::CloseBrace, self.location, self.location));
                 },
 
                 // Comment
@@ -310,6 +356,16 @@ impl Lexer {
                         self.location,
                     ));
                 },
+
+                '\n' => {
+                    self.advance();
+                    tokens.push(Segment::new(Token::Newline, self.location, self.location));
+                },
+
+                _ if Token::is_valid_identifier_char(current_char) => {
+                    tokens.push(self.tokenize_word()?);
+                },
+
                 _ => todo!(),
             }
         }
@@ -521,7 +577,6 @@ mod tests {
         }
     }
 
-
     #[test_case(
         r#""""Hello world"""."""#,
         LexerError::new(
@@ -551,5 +606,62 @@ mod tests {
             new_lexer(multiline_string).tokenize_multiline_string(),
             Err(expected_error)
         );
+    }
+
+    #[test_case(
+        "true ", Segment::new(
+            Token::True,
+            Location::new(),
+            Location::from((0, 4, 4))
+        ) ; "true keyword"
+    )]
+    #[test_case(
+        "false ", Segment::new(
+            Token::False,
+            Location::new(),
+            Location::from((0, 5, 5))
+        ) ; "false keyword"
+    )]
+    #[test_case(
+        "false", Segment::new(
+            Token::False,
+            Location::new(),
+            Location::from((0, 5, 5))
+        ) ; "keyword eof"
+    )]
+    #[test_case(
+        "some-key", Segment::new(
+            Token::Identifier("some-key".to_string()),
+            Location::new(),
+            Location::from((0, 8, 8))
+        ) ; "kebab case key"
+    )]
+    #[test_case(
+        "some_key", Segment::new(
+            Token::Identifier("some_key".to_string()),
+            Location::new(),
+            Location::from((0, 8, 8))
+        ) ; "snake case key"
+    )]
+    #[test_case(
+        "1_very-confused_key", Segment::new(
+            Token::Identifier("1_very-confused_key".to_string()),
+            Location::new(),
+            Location::from((0, 19, 19))
+        ) ; "mixed case key"
+    )]
+    fn test_tokenize_word(
+        word: &str, expected_segment: Segment
+    ) {
+        let mut lexer = new_lexer(word);
+
+        match lexer.tokenize_word() {
+            Ok(segment) => {
+                assert_eq!(segment, expected_segment);
+            },
+            Err(e) => {
+                panic!("{}", e);
+            }
+        }
     }
 }

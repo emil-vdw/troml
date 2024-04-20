@@ -18,7 +18,6 @@ impl Segment {
 pub enum Token {
     // Basic types
     Comment(String),
-    Identifier(String),
 
     // Literals
     String {
@@ -27,7 +26,7 @@ pub enum Token {
         multiline: bool,
     },
 
-    Integer(i64), Float(f64), Boolean(bool),
+    Integer(String), Float(String), Boolean(bool),
     // TODO
     // DateTime (offset date-time?), Date, Time,
 
@@ -39,8 +38,16 @@ pub enum Token {
     CloseBrace,     // }
 
     // Keywords
-    True, False,
+    True, False, Identifier(String),
 
     // Meta tokens
     Whitespace(String), Newline, Eof,
+}
+
+impl Token {
+    pub fn is_valid_identifier_char(c: char) -> bool {
+        c.is_ascii_alphanumeric()
+            || c == '_'
+            || c == '-'
+    }
 }

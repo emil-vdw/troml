@@ -17,7 +17,7 @@ value        -> inline_table | literal;
 
 inline_table -> "{" pair ( "," pair )* "}";
 
-key_part     -> BareKey | Integer | String;
+key_part     -> identifier | Integer | String;
 
 // TODO: Add date/time related tokens.
 literal      -> Integer | Float | String | True | False;
