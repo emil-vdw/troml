@@ -10,7 +10,7 @@ fn main() {
         name: "test.toml".to_string(),
         contents: fs::read_to_string("./src/tests/test.toml").expect("could not find ''test.toml'"),
     };
-    let mut lexer = Lexer::new(&file);
+    let mut lexer = Lexer::new(file);
 
     match lexer.tokenize() {
         Ok(tokens) => {

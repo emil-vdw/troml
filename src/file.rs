@@ -1,4 +1,4 @@
-use std::{fmt, ops::Add};
+use std::{fmt, fs, ops::Add};
 
 #[derive(Debug, Clone)]
 pub struct File {
@@ -6,11 +6,19 @@ pub struct File {
     pub contents: String,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Location {
     pub line: usize,
     pub column: usize,
     pub char: usize,
+}
+
+impl File {
+    pub fn new(name: &str, contents: &str) -> Self {
+        File {
+            name: name.to_string(), contents: contents.to_string(),
+        }
+    }
 }
 
 impl Location {
@@ -29,6 +37,14 @@ impl Location {
         self.char += 1;
         self.line += 1;
         self.column = 0;
+    }
+}
+
+impl From<(usize, usize, usize)> for Location {
+    fn from(location: (usize, usize, usize)) -> Self {
+        Location {
+            line: location.0, column: location.1, char: location.2
+        }
     }
 }
 

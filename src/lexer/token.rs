@@ -1,6 +1,6 @@
 use crate::file::Location;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Segment {
     token: Token,
     // raw: String,
@@ -14,7 +14,7 @@ impl Segment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     // Basic types
     Comment(String),
