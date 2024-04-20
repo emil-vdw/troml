@@ -1,8 +1,9 @@
-use std::{fmt, fs, ops::Add};
+use std::{fmt, fs, ops::Add, path::Path};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub struct File {
     pub name: String,
+    pub path: String,
     pub contents: String,
 }
 
@@ -14,10 +15,18 @@ pub struct Location {
 }
 
 impl File {
-    pub fn new(name: &str, contents: &str) -> Self {
+    pub fn new(path: &str, contents: String) -> Self {
         File {
-            name: name.to_string(), contents: contents.to_string(),
+            path: path.to_string(),
+            name: Path::new(path).file_name().expect("must target a file and not a directory").to_os_string().into_string().unwrap(),
+            contents,
         }
+    }
+}
+
+impl PartialEq for File {
+    fn eq(&self, other: &File) -> bool {
+        self.path == other.path && self.name == other.name
     }
 }
 

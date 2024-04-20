@@ -6,20 +6,27 @@ use self::token::{Segment, Token};
 
 pub mod token;
 
-#[derive(Debug)]
-pub struct Error {
+#[derive(Debug, PartialEq, Eq)]
+pub struct LexerError {
     message: String,
     file: File,
     start: Location,
     end: Location,
 }
 
-impl Error {}
+impl LexerError {
+    pub fn new(message: &str, file: &File, start: Location, end: Location) -> Self {
+        Self {
+            message: message.to_string(),
+            file: file.clone(),
+            start, end,
+        }
+    }
+}
 
-impl fmt::Display for Error {
+impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut error_string = String::new();
-        dbg!((self.start, self.end));
 
         self.file.contents.lines().enumerate().skip(self.start.line).take(self.end.line - self.start.line + 1).for_each(
             |(line_number, line)| {
@@ -33,10 +40,10 @@ impl fmt::Display for Error {
                 let end_column = if self.end.line == self.start.line {
                     self.end.column - self.start.column
                 } else {
-                    line.len()
+                    line.len() - self.start.column
                 };
 
-                error_string.push_str(&"^".repeat(end_column));
+                error_string.push_str(&"^".repeat(end_column + 1));
             });
 
         write!(
@@ -47,7 +54,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+impl error::Error for LexerError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         None
     }
@@ -55,7 +62,7 @@ impl error::Error for Error {
 
 macro_rules! lexer_error {
     ($message:expr, $file:expr, $start:expr, $end:expr) => {
-        Err(Error { message: String::from($message), file: $file.clone(), start: $start, end: $end })
+        Err(LexerError { message: String::from($message), file: $file.clone(), start: $start, end: $end })
     };
 }
 
@@ -68,7 +75,7 @@ macro_rules! lexer_error {
 /// use lexer::Lexer;
 /// use file::File;
 ///
-/// let file = File::new("Test file", "Hello, world!");
+/// let file = File::new("/path/to/file", "Hello, world!");
 /// let mut lexer = Lexer::new(file);
 /// let tokens = lexer.tokenize().unwrap();
 /// ```
@@ -89,44 +96,44 @@ impl Lexer {
         }
     }
 
-    fn tokenize_string(&mut self) -> Result<Segment, Error> {
+    fn tokenize_string(&mut self) -> Result<Segment, LexerError> {
         todo!()
     }
 
-    fn tokenize_multiline_string(&mut self) -> Result<Segment, Error> {
+    fn tokenize_multiline_string(&mut self) -> Result<Segment, LexerError> {
         let start = self.location;
         let mut content = String::new();
 
         // Ignore the quotes, we don't want them to show up in the token.
         self.advance_by(3);
 
-        while let Some(next_char) = self.advance() {
+        while let Some(next_char) = self.peek(0) {
             match next_char {
-                '\\' => if self.peek(1).is_none() {
-                    return lexer_error!(
-                        "unexpected end of file, expected an escaped character",
-                        self.file,
-                        self.location,
-                        self.location
-                    );
+                '\\' => {
+                    if self.peek(1).is_none() {
+                        return lexer_error!(
+                            "unexpected end of file, expected an escaped character",
+                            self.file,
+                            self.location,
+                            self.location
+                        );
+                    }
+
+                    content.push_str(&self.advance_by(2).unwrap());
                 },
                 '"' => {
                     // Detect whether the string is being terminated.
-                    let mut lookahead_index = 0;
+                    let mut lookahead_index = 1;
                     let mut consecutive_quotes = 1;
 
                     loop {
-                        match dbg!(self.peek(lookahead_index)) {
+                        match self.peek(lookahead_index) {
                             Some('"') => {
                                 consecutive_quotes += 1;
                             },
                             Some('\n') | None => {
-                                if (dbg!(consecutive_quotes) >= 3) {
+                                if consecutive_quotes >= 3 {
                                     self.advance_by(lookahead_index).unwrap();
-                                    // Multiline string has been terminated.
-                                    // content.push_str(
-                                    //     &self.advance_by(lookahead_index - 1).unwrap()
-                                    // );
                                     return Ok(
                                         Segment::new(
                                             Token::String { content, literal: false, multiline: true },
@@ -147,6 +154,7 @@ impl Lexer {
                             Some(outside_char) => {
                                 // Some other character
                                 if consecutive_quotes >= 3 {
+                                    self.advance_by(consecutive_quotes);
                                     return lexer_error!(
                                         format!("expected end of line, found '{outside_char}'"),
                                         self.file,
@@ -156,7 +164,7 @@ impl Lexer {
                                 }
 
                                 content.push_str(
-                                    &self.advance_by(lookahead_index - 1).unwrap()
+                                    &self.advance_by(lookahead_index + 1).unwrap()
                                 );
                                 break;
                             },
@@ -165,7 +173,7 @@ impl Lexer {
                         lookahead_index += 1;
                     }
                 },
-                _ => content.push(next_char),
+                _ => content.push(self.advance().unwrap()),
             }
         }
 
@@ -180,7 +188,7 @@ impl Lexer {
         )
     }
 
-    fn tokenize_comment(&mut self) -> Result<Segment, Error> {
+    fn tokenize_comment(&mut self) -> Result<Segment, LexerError> {
         let start = self.location;
         let mut comment_string = String::new();
 
@@ -200,7 +208,7 @@ impl Lexer {
         )
     }
 
-    pub fn tokenize(&mut self) -> Result<Vec<Segment>, Error> {
+    pub fn tokenize(&mut self) -> Result<Vec<Segment>, LexerError> {
         let mut tokens: Vec<Segment> = Vec::new();
 
         while let Some(current_char) = self.peek(0) {
@@ -292,7 +300,8 @@ impl Lexer {
     /// Advance the lexer by `amount` characters.
     /// Returns the characters that were advanced over.
     fn advance_by(&mut self, amount: usize) -> Option<String> {
-        self.peek(1)?;
+        // Return None if the end of the file has been reached.
+        self.peek(0)?;
 
         let mut section = String::new();
 
@@ -300,6 +309,7 @@ impl Lexer {
             if let Some(next_char) = self.advance() {
                 section.push(next_char);
             } else {
+                // End of file reached before advancing `amount` characters.
                 return Some(section);
             }
         }
@@ -316,7 +326,7 @@ mod tests {
 
     fn new_lexer(file_contents: &str) -> Lexer {
         Lexer::new(
-            File::new("Test file", file_contents)
+            File::new("/tests/test.toml", file_contents.to_string())
         )
     }
 
@@ -353,7 +363,25 @@ mod tests {
             Location::from((0, 17, 17))
         ) ; "A simple multiline string"
     )]
-    fn test_tokenize_multiline_string(
+    #[test_case(
+        "\"\"\"Hello world\"\"\"\n", Segment::new(
+            Token::String { content: "Hello world".to_string(), literal: false, multiline: true },
+            Location::new(),
+            Location::from((0, 17, 17))
+        ) ; "A simple newline terminated multiline string"
+    )]
+    #[test_case(
+        concat!(r#""""Here are two quotation marks: "". Simple enough.""""#, '\n'), Segment::new(
+            Token::String {
+                content: r#"Here are two quotation marks: "". Simple enough."#.to_string(),
+                literal: false,
+                multiline: true
+            },
+            Location::new(),
+            Location::from((0, 54, 54))
+        ) ; "A multiline string containing quotes"
+    )]
+    fn test_multiline_string(
         multiline_string: &str, expected_segment: Segment
     ) {
         let mut lexer = new_lexer(multiline_string);
@@ -361,6 +389,32 @@ mod tests {
         assert_eq!(
             lexer.tokenize_multiline_string().unwrap(),
             expected_segment
+        );
+    }
+
+
+    #[test_case(
+        r#""""Hello world"""."""#,
+        LexerError::new(
+            "expected end of line, found '.'",
+            &File::new("/tests/test.toml", String::from(
+                r#""""Hello world"""."""#,
+            )),
+            Location::from((0, 17, 17)),
+            Location::from((0, 17, 17))
+        )
+        ; "Three consequetive unescaped quotes"
+    )]
+    fn test_invalid_multiline_string(
+        multiline_string: &str, expected_error: LexerError
+    ) {
+        match new_lexer(multiline_string).tokenize_multiline_string() {
+            Err(e) => println!("{}", e),
+            _ => (),
+        }
+        assert_eq!(
+            new_lexer(multiline_string).tokenize_multiline_string(),
+            Err(expected_error)
         );
     }
 }

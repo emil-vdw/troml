@@ -10,6 +10,10 @@ fn main() {
         name: "test.toml".to_string(),
         contents: fs::read_to_string("./src/tests/test.toml").expect("could not find ''test.toml'"),
     };
+
+    assert_eq!(
+        file.contents, "Hello World".to_string()
+    );
     let mut lexer = Lexer::new(file);
 
     match lexer.tokenize() {
