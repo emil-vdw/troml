@@ -59,6 +59,19 @@ macro_rules! lexer_error {
     };
 }
 
+
+/// A lexer that tokenizes a file.
+///
+/// # Examples
+///
+/// ```
+/// use lexer::Lexer;
+/// use file::File;
+///
+/// let file = File::new("Test file", "Hello, world!");
+/// let mut lexer = Lexer::new(file);
+/// let tokens = lexer.tokenize().unwrap();
+/// ```
 #[derive(Debug)]
 pub struct Lexer {
     file: File,
@@ -82,8 +95,10 @@ impl Lexer {
 
     fn tokenize_multiline_string(&mut self) -> Result<Segment, Error> {
         let start = self.location;
-        
         let mut content = String::new();
+
+        // Ignore the quotes, we don't want them to show up in the token.
+        self.advance_by(3);
 
         while let Some(next_char) = self.advance() {
             match next_char {
@@ -97,20 +112,21 @@ impl Lexer {
                 },
                 '"' => {
                     // Detect whether the string is being terminated.
-                    let mut lookahead_index = 1;
+                    let mut lookahead_index = 0;
                     let mut consecutive_quotes = 1;
 
                     loop {
-                        match self.peek(lookahead_index) {
+                        match dbg!(self.peek(lookahead_index)) {
                             Some('"') => {
                                 consecutive_quotes += 1;
                             },
                             Some('\n') | None => {
-                                if consecutive_quotes >= 3 {
+                                if (dbg!(consecutive_quotes) >= 3) {
+                                    self.advance_by(lookahead_index).unwrap();
                                     // Multiline string has been terminated.
-                                    content.push_str(
-                                        &self.advance_by(lookahead_index - 1).unwrap()
-                                    );
+                                    // content.push_str(
+                                    //     &self.advance_by(lookahead_index - 1).unwrap()
+                                    // );
                                     return Ok(
                                         Segment::new(
                                             Token::String { content, literal: false, multiline: true },
@@ -145,6 +161,7 @@ impl Lexer {
                                 break;
                             },
                         }
+
                         lookahead_index += 1;
                     }
                 },
@@ -207,7 +224,12 @@ impl Lexer {
                 '#' => tokens.push(self.tokenize_comment()?),
 
                 // String
-                '"' => tokens.push(self.tokenize_string()?),
+                '"' => {
+                    match (self.peek(1), self.peek(2)) {
+                        (Some('"'), Some('"')) => tokens.push(self.tokenize_multiline_string()?),
+                        _ => tokens.push(self.tokenize_string()?),
+                    }
+                },
 
                 // String literal
 
@@ -240,7 +262,9 @@ impl Lexer {
         Ok(tokens)
     }
 
-    // Peak ahead by `amount` characters.
+    /// Peek at the character at `amount` characters ahead.
+    /// `0` will return the current character under the cursor.
+    /// Returns `None` if the end of the file has been reached.
     fn peek(&self, amount: usize) -> Option<char> {
         if self.location.char + amount >= self.chars.len() {
             None
@@ -249,6 +273,8 @@ impl Lexer {
         }
     }
 
+    /// Advance the lexer by one character.
+    /// Returns the character that was advanced over.
     fn advance(&mut self) -> Option<char> {
         match self.peek(0) {
             Some(current_char) => {
@@ -263,6 +289,8 @@ impl Lexer {
         }
     }
 
+    /// Advance the lexer by `amount` characters.
+    /// Returns the characters that were advanced over.
     fn advance_by(&mut self, amount: usize) -> Option<String> {
         self.peek(1)?;
 
