@@ -133,7 +133,15 @@ impl Lexer {
                             },
                             Some('\n') | None => {
                                 if consecutive_quotes >= 3 {
-                                    self.advance_by(lookahead_index).unwrap();
+                                    if consecutive_quotes > 3 {
+                                        // Include any quotes up until the last three.
+                                        content.push_str(&self.advance_by(consecutive_quotes - 3).unwrap());
+                                    }
+
+                                    self.advance_by(3).expect(
+                                        "multiline string has to be terminated by 3 quotes"
+                                    );
+
                                     return Ok(
                                         Segment::new(
                                             Token::String { content, literal: false, multiline: true },
@@ -295,6 +303,8 @@ impl Lexer {
     /// Returns the characters that were advanced over.
     fn advance_by(&mut self, amount: usize) -> Option<String> {
         // Return None if the end of the file has been reached.
+        if amount == 0 { return None; }
+
         self.peek(0)?;
 
         let mut section = String::new();
@@ -396,6 +406,17 @@ mod tests {
             Location::new(),
             Location::from((0, 61, 61))
         ) ; "many valid consequetive quotes"
+    )]
+    #[test_case(
+        concat!(r#"""""This," she said, "is just a pointless statement."""""#, '\n'), Segment::new(
+            Token::String {
+                content: r#""This," she said, "is just a pointless statement.""#.to_string(),
+                literal: false,
+                multiline: true
+            },
+            Location::new(),
+            Location::from((0, 56, 56))
+        ) ; "containing quoted string"
     )]
     fn test_multiline_string(
         multiline_string: &str, expected_segment: Segment
