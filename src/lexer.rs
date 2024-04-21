@@ -19,7 +19,8 @@ impl LexerError {
         Self {
             message: message.to_string(),
             file: file.clone(),
-            start, end,
+            start,
+            end,
         }
     }
 }
@@ -28,8 +29,13 @@ impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut error_string = String::new();
 
-        self.file.contents.lines().enumerate().skip(self.start.line).take(self.end.line - self.start.line + 1).for_each(
-            |(line_number, line)| {
+        self.file
+            .contents
+            .lines()
+            .enumerate()
+            .skip(self.start.line)
+            .take(self.end.line - self.start.line + 1)
+            .for_each(|(line_number, line)| {
                 error_string.push_str(line);
                 error_string.push('\n');
 
@@ -46,11 +52,7 @@ impl fmt::Display for LexerError {
                 error_string.push_str(&"^".repeat(end_column + 1));
             });
 
-        write!(
-            f,
-            "{error_string}\n\t{message}",
-            message=self.message,
-        )
+        write!(f, "{error_string}\n\t{message}", message = self.message,)
     }
 }
 
@@ -62,10 +64,14 @@ impl error::Error for LexerError {
 
 macro_rules! lexer_error {
     ($message:expr, $file:expr, $start:expr, $end:expr) => {
-        Err(LexerError { message: String::from($message), file: $file.clone(), start: $start, end: $end })
+        Err(LexerError {
+            message: String::from($message),
+            file: $file.clone(),
+            start: $start,
+            end: $end,
+        })
     };
 }
-
 
 /// A lexer that tokenizes a file.
 ///
@@ -116,16 +122,13 @@ impl Lexer {
                         );
                     }
                     content.push_str(&self.advance_by(2).unwrap());
-                },
+                }
                 '\"' => {
                     // The string should be terminated.
                     let outside_char = self.peek(1);
                     if outside_char.is_some_and(|c| c != '\n') {
                         return lexer_error!(
-                            format!(
-                                "expected end of line, found '{}'",
-                                outside_char.unwrap()
-                            ),
+                            format!("expected end of line, found '{}'", outside_char.unwrap()),
                             self.file,
                             self.location,
                             self.location
@@ -134,12 +137,16 @@ impl Lexer {
 
                     self.advance();
                     return Ok(Segment::new(
-                        Token::String { content, literal: false, multiline: false },
+                        Token::String {
+                            content,
+                            literal: false,
+                            multiline: false,
+                        },
                         start,
-                        self.location
+                        self.location,
                     ));
-                },
-                _ => { content.push(self.advance().unwrap()) },
+                }
+                _ => content.push(self.advance().unwrap()),
             }
         }
 
@@ -149,7 +156,7 @@ impl Lexer {
             self.file,
             self.location,
             self.location
-        )
+        );
     }
 
     fn tokenize_multiline_string(&mut self) -> Result<Segment, LexerError> {
@@ -172,7 +179,7 @@ impl Lexer {
                     }
 
                     content.push_str(&self.advance_by(2).unwrap());
-                },
+                }
                 '"' => {
                     // Detect whether the string is being terminated.
                     let mut lookahead_index = 1;
@@ -182,27 +189,31 @@ impl Lexer {
                         match self.peek(lookahead_index) {
                             Some('"') => {
                                 consecutive_quotes += 1;
-                            },
+                            }
                             Some('\n') | None => {
                                 if consecutive_quotes >= 3 {
                                     if consecutive_quotes > 3 {
                                         // Include any quotes up until the last three.
-                                        content.push_str(&self.advance_by(consecutive_quotes - 3).unwrap());
+                                        content.push_str(
+                                            &self.advance_by(consecutive_quotes - 3).unwrap(),
+                                        );
                                     }
 
                                     self.advance_by(3).expect(
-                                        "multiline string has to be terminated by 3 quotes"
+                                        "multiline string has to be terminated by 3 quotes",
                                     );
 
-                                    return Ok(
-                                        Segment::new(
-                                            Token::String { content, literal: false, multiline: true },
-                                            start,
-                                            self.location
-                                        )
-                                    )
+                                    return Ok(Segment::new(
+                                        Token::String {
+                                            content,
+                                            literal: false,
+                                            multiline: true,
+                                        },
+                                        start,
+                                        self.location,
+                                    ));
                                 }
-                            },
+                            }
                             Some(outside_char) => {
                                 // Some non-quote character after the quotes.
                                 if consecutive_quotes >= 3 {
@@ -217,26 +228,24 @@ impl Lexer {
 
                                 // We have determined that the quotes are valid
                                 // so we can add them to the content.
-                                content.push_str(
-                                    &self.advance_by(consecutive_quotes).unwrap()
-                                );
+                                content.push_str(&self.advance_by(consecutive_quotes).unwrap());
                                 break;
-                            },
+                            }
                         }
 
                         lookahead_index += 1;
                     }
-                },
+                }
                 _ => content.push(self.advance().unwrap()),
             }
         }
 
         // We have reachec the end of the file without finding the end of the string.
-         lexer_error!(
-             "unexpected end of file, expected end of multiline string",
-             self.file,
-             self.location,
-             self.location
+        lexer_error!(
+            "unexpected end of file, expected end of multiline string",
+            self.file,
+            self.location,
+            self.location
         )
     }
 
@@ -251,13 +260,11 @@ impl Lexer {
             comment_string.push(self.advance().unwrap());
         }
 
-        Ok(
-            Segment::new(
-                Token::Comment(comment_string),
-                start,
-                self.location,
-            )
-        )
+        Ok(Segment::new(
+            Token::Comment(comment_string),
+            start,
+            self.location,
+        ))
     }
 
     fn tokenize_word(&mut self) -> Result<Segment, LexerError> {
@@ -267,22 +274,16 @@ impl Lexer {
         loop {
             match self.peek(0) {
                 Some(next_char) if Token::is_valid_identifier_char(next_char) => {
-                        content.push(self.advance().unwrap());
-                    },
+                    content.push(self.advance().unwrap());
+                }
                 Some(_) | None => {
                     // First match keywords.
                     let token = match &content[..] {
-                        "true" => Token::True,
-                        "false" => Token::False,
-                        _ => {
-                            Token::Identifier(content)
-                        }
+                        "true" => Token::Boolean(true),
+                        "false" => Token::Boolean(false),
+                        _ => Token::Identifier(content),
                     };
-                    return Ok(Segment::new(
-                        token,
-                        start,
-                        self.location
-                    ));
+                    return Ok(Segment::new(token, start, self.location));
                 }
             }
         }
@@ -295,46 +296,54 @@ impl Lexer {
             match current_char {
                 '=' => {
                     self.advance();
-                    tokens.push(
-                        Segment::new(Token::Equal, self.location, self.location)
-                    );
-                },
+                    tokens.push(Segment::new(Token::Equal, self.location, self.location));
+                }
                 '.' => {
                     self.advance();
                     tokens.push(Segment::new(Token::Dot, self.location, self.location));
-                },
+                }
                 ',' => {
                     self.advance();
                     tokens.push(Segment::new(Token::Comma, self.location, self.location));
-                },
+                }
 
                 // Brackets
                 '[' => {
                     self.advance();
-                    tokens.push(Segment::new(Token::OpenBracket, self.location, self.location));
-                },
+                    tokens.push(Segment::new(
+                        Token::OpenBracket,
+                        self.location,
+                        self.location,
+                    ));
+                }
                 ']' => {
                     self.advance();
-                    tokens.push(Segment::new(Token::CloseBracket, self.location, self.location));
-                },
+                    tokens.push(Segment::new(
+                        Token::CloseBracket,
+                        self.location,
+                        self.location,
+                    ));
+                }
                 '{' => {
                     self.advance();
                     tokens.push(Segment::new(Token::OpenBrace, self.location, self.location));
-                },
+                }
                 '}' => {
                     self.advance();
-                    tokens.push(Segment::new(Token::CloseBrace, self.location, self.location));
-                },
+                    tokens.push(Segment::new(
+                        Token::CloseBrace,
+                        self.location,
+                        self.location,
+                    ));
+                }
 
                 // Comment
                 '#' => tokens.push(self.tokenize_comment()?),
 
                 // String
-                '"' => {
-                    match (self.peek(1), self.peek(2)) {
-                        (Some('"'), Some('"')) => tokens.push(self.tokenize_multiline_string()?),
-                        _ => tokens.push(self.tokenize_string()?),
-                    }
+                '"' => match (self.peek(1), self.peek(2)) {
+                    (Some('"'), Some('"')) => tokens.push(self.tokenize_multiline_string()?),
+                    _ => tokens.push(self.tokenize_string()?),
                 },
 
                 // String literal
@@ -355,26 +364,22 @@ impl Lexer {
                         start,
                         self.location,
                     ));
-                },
+                }
 
                 '\n' => {
                     self.advance();
                     tokens.push(Segment::new(Token::Newline, self.location, self.location));
-                },
+                }
 
                 _ if Token::is_valid_identifier_char(current_char) => {
                     tokens.push(self.tokenize_word()?);
-                },
+                }
 
                 _ => todo!(),
             }
         }
 
-        tokens.push(Segment::new(
-            Token::Eof,
-            self.location,
-            self.location,
-        ));
+        tokens.push(Segment::new(Token::Eof, self.location, self.location));
         Ok(tokens)
     }
 
@@ -401,7 +406,7 @@ impl Lexer {
                 }
                 Some(current_char)
             }
-            None => None
+            None => None,
         }
     }
 
@@ -409,7 +414,9 @@ impl Lexer {
     /// Returns the characters that were advanced over.
     fn advance_by(&mut self, amount: usize) -> Option<String> {
         // Return None if the end of the file has been reached.
-        if amount == 0 { return None; }
+        if amount == 0 {
+            return None;
+        }
 
         self.peek(0)?;
 
@@ -435,9 +442,7 @@ mod tests {
     use test_case::test_case;
 
     fn new_lexer(file_contents: &str) -> Lexer {
-        Lexer::new(
-            File::new("/tests/test.toml", file_contents.to_string())
-        )
+        Lexer::new(File::new("/tests/test.toml", file_contents.to_string()))
     }
 
     #[test_case(
@@ -454,16 +459,10 @@ mod tests {
             Location::from((0, 1, 1))
         ) ; "An empty comment"
     )]
-    fn test_tokenize_comment(
-        comment_string: & str,
-        expected_segment: Segment
-    ) {
+    fn test_tokenize_comment(comment_string: &str, expected_segment: Segment) {
         let mut lexer = new_lexer(comment_string);
 
-        assert_eq!(
-            lexer.tokenize_comment().unwrap(),
-            expected_segment
-        );
+        assert_eq!(lexer.tokenize_comment().unwrap(), expected_segment);
     }
 
     #[test_case(
@@ -482,7 +481,7 @@ mod tests {
         match lexer.tokenize_string() {
             Ok(segment) => {
                 assert_eq!(segment, expected_segment);
-            },
+            }
             Err(e) => {
                 panic!("{}", e);
             }
@@ -562,15 +561,13 @@ mod tests {
             Location::from((2, 13, 39))
         ) ; "multiple lines"
     )]
-    fn test_multiline_string(
-        multiline_string: &str, expected_segment: Segment
-    ) {
+    fn test_multiline_string(multiline_string: &str, expected_segment: Segment) {
         let mut lexer = new_lexer(multiline_string);
 
         match lexer.tokenize_multiline_string() {
             Ok(segment) => {
                 assert_eq!(segment, expected_segment);
-            },
+            }
             Err(e) => {
                 panic!("{}", e);
             }
@@ -599,9 +596,7 @@ mod tests {
         )
         ; "unterminated"
     )]
-    fn test_invalid_multiline_string(
-        multiline_string: &str, expected_error: LexerError
-    ) {
+    fn test_invalid_multiline_string(multiline_string: &str, expected_error: LexerError) {
         assert_eq!(
             new_lexer(multiline_string).tokenize_multiline_string(),
             Err(expected_error)
@@ -650,15 +645,13 @@ mod tests {
             Location::from((0, 19, 19))
         ) ; "mixed case key"
     )]
-    fn test_tokenize_word(
-        word: &str, expected_segment: Segment
-    ) {
+    fn test_tokenize_word(word: &str, expected_segment: Segment) {
         let mut lexer = new_lexer(word);
 
         match lexer.tokenize_word() {
             Ok(segment) => {
                 assert_eq!(segment, expected_segment);
-            },
+            }
             Err(e) => {
                 panic!("{}", e);
             }

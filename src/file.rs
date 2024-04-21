@@ -18,7 +18,12 @@ impl File {
     pub fn new(path: &str, contents: String) -> Self {
         File {
             path: path.to_string(),
-            name: Path::new(path).file_name().expect("must target a file and not a directory").to_os_string().into_string().unwrap(),
+            name: Path::new(path)
+                .file_name()
+                .expect("must target a file and not a directory")
+                .to_os_string()
+                .into_string()
+                .unwrap(),
             contents,
         }
     }
@@ -33,7 +38,9 @@ impl PartialEq for File {
 impl Location {
     pub fn new() -> Self {
         Location {
-            line: 0, column: 0, char: 0
+            line: 0,
+            column: 0,
+            char: 0,
         }
     }
 
@@ -52,7 +59,9 @@ impl Location {
 impl From<(usize, usize, usize)> for Location {
     fn from(location: (usize, usize, usize)) -> Self {
         Location {
-            line: location.0, column: location.1, char: location.2
+            line: location.0,
+            column: location.1,
+            char: location.2,
         }
     }
 }

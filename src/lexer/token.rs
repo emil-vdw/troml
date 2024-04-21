@@ -2,10 +2,10 @@ use crate::file::Location;
 
 #[derive(Debug, PartialEq)]
 pub struct Segment {
-    token: Token,
+    pub token: Token,
     // raw: String,
-    start: Location,
-    end: Location,
+    pub start: Location,
+    pub end: Location,
 }
 
 impl Segment {
@@ -26,28 +26,31 @@ pub enum Token {
         multiline: bool,
     },
 
-    Integer(String), Float(String), Boolean(bool),
+    Integer(String),
+    Float(String),
+    Boolean(bool),
     // TODO
     // DateTime (offset date-time?), Date, Time,
+    Equal,
+    Dot,
+    Comma,
 
-    Equal, Dot, Comma,
-
-    OpenBracket,    // [
-    CloseBracket,   // ]
-    OpenBrace,      // {
-    CloseBrace,     // }
+    OpenBracket,  // [
+    CloseBracket, // ]
+    OpenBrace,    // {
+    CloseBrace,   // }
 
     // Keywords
-    True, False, Identifier(String),
+    Identifier(String),
 
     // Meta tokens
-    Whitespace(String), Newline, Eof,
+    Whitespace(String),
+    Newline,
+    Eof,
 }
 
 impl Token {
     pub fn is_valid_identifier_char(c: char) -> bool {
-        c.is_ascii_alphanumeric()
-            || c == '_'
-            || c == '-'
+        c.is_ascii_alphanumeric() || c == '_' || c == '-'
     }
 }

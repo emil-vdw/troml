@@ -1,5 +1,5 @@
 * Types
-entry        -> Comment | table | table_array;
+statement    -> Comment | table | table_array;
 
 table        -> header Newline+ ( key Equals expression Newline)* Newline*;
 
